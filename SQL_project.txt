@@ -1,0 +1,106 @@
+ --To analyse the data of the restaurant that just started few months ago
+That will help to run the business in an efficient manner and
+emphasizing on understanding the choices of the customer.
+
+ --A little introduction of the restaurant :
+It focuses on the Japanese Food that sell three foods –
+Sushi ,curry and ramen.
+
+ --They had just started the loyalty membership program and that gives
+rewards to the customer who became a member.
+Understanding the ways to expand the membership program.
+
+Three tables:
+
+Sales--customer-id-> id of customer
+       order_date-> date when the food was order
+       product_id-> id of the product
+
+Menus--price-> price of the product
+       product_name-> name of the product
+       product_id-> id of the product
+
+members--customer-id-> id of customer
+         join_date-> date when the customer joined the reward
+         product_id-> id of the product
+
+ --Q1.) Total Item spend by each customer at the restaurant ?
+
+       select s.customer_id,sum(price) as total from sales s inner join menu m on s.product_id = m.product_id
+       group by s.customer_id
+       order by total desc;
+
+ --Q2.) How many days each customer visited the restaurant ?
+
+       select customer_id,count(distinct order_date) as total_days from sales
+       group by customer_id;
+
+ --Q3.) The first item from the menu purchased by each customer
+
+       select m.product_id,s.customer_id,m.product_name from (select s.customer_id,s.order_date,m.product_name,m.product_id,row_number()over(partition by s.customer_id order by s.order_date) as rnk from sales s
+ inner join menu m on sales.product_id = menu.product_id) as a
+ where rnk = 1;
+
+ --Q4.) Most purchased item on the menu and how many times was it purchased by all customers
+
+       select count(m.product_name) as total,m.product_id,m.product_name
+       from sales s inner join menu m on s.product_id = m.product_id
+       group by m.product_name
+       order by total desc
+       limit 1;
+
+ --Q5.) Item was the most popular for each customer
+        
+       select s.customer_id,m.product_name,order_count
+	 from 
+       (select s.customer_id,m.product_name,m.product_id,count(product_name) as order_count,
+	row_number()over(partition by s.customer_id order by count(m.product_name)desc)as rnk
+	from sales s inner join menu m on s.product_id = m.product_id
+	group by s.customer_id,m.product_name) as a
+	where rnk =1;
+
+ --Q6.) Item was purchased first by the customer after they became a member
+
+	select s.customer_id,s.order_date,me.join_date,m.product_name,m.product_id,rank()
+	over(partition by s.customer_id order by s.order_date asc) as rnk from sales s inner join members me on 
+	s.customer_id = me.customer_id inner join menu m on m.product_id = s.product_id
+	where s.order_dates>=me.join_date) as a
+	where rnk =1;
+
+ --Q7.) Item was purchased just before the customer became a member
+
+	select s.customer_id,m.product_name,m.product_id,me.join_date,s.order_date from
+	(select s.customer_id,s.order_date,me.join_date,m.product_name,m.product_id,
+	row_number() over (partition by s.customer_id order by s.order_date) as rnk from sales s
+	inner join members me on s.customer_id = me.customer_id
+	inner join menu m on m.product_id = s.product_id
+	where s.order_date < me.join_date) as a
+	where rnk = 1;
+
+ --Q8.) Total items and amount spent for each member before they became a member
+	
+	select s.customer_id,m.product_id,sum(m.price * 20) as reward 
+	from sales s inner join members me on s.customer_id = me.customer_id
+	inner join menu m on m.product_id = s.product_id
+	where s.order_date>=me.join_date AND extract(month from s.order_date) = 1
+	group by s.customer_id;
+
+ --Q9.) If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer 	 have ?
+
+	select s.customer_id,m.product_id,m.product_name,sum(case when m.product_name="Sushi" then price*20 
+	else price*10 end) as total_price from sales s inner join menu m on s.product_id = m.product_id
+	group by s.customer_id;
+
+
+
+                       				----Key Insights----  
+
+
+	1.) B frequently visit the restaurant followed by A and C.
+	2.) A spent the most amount followed by B and c.
+	3.) First dish ordered by A is Sushi.First dish ordered by B is curry.FIrst dish ordered by C is ramen.
+	4.) The most item that was purchased is Ramen.
+	5.) The most popular dish for A and C is ramen and B is curry.
+	6.) A and B became member of the loyalty program and ordered sushi and curry after they became a member.
+	7.) They ordered the same food before they became a member.
+	8.) B has the maximum points followed by A and C.
